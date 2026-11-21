@@ -17,78 +17,59 @@ import com.financesuite.zsurapp.category.dto.CreateCategoryRequest;
 import com.financesuite.zsurapp.category.entity.Category;
 import com.financesuite.zsurapp.category.service.CategoryService;
 
+import com.financesuite.zsurapp.category.dto.UpdateCategoryRequest;
+
 @RestController
-@RequestMapping(
-    "/api/v1/workspaces/{workspaceId}/categories"
-)
+@RequestMapping("/api/v1/workspaces/{workspaceId}/categories")
 public class CategoryController {
 
-    private final CategoryService service;
+	private final CategoryService service;
 
-    public CategoryController(CategoryService service) {
-        this.service = service;
-    }
+	public CategoryController(CategoryService service) {
+		this.service = service;
+	}
 
-    @PostMapping
-    public ResponseEntity<CategoryResponse> create(
-            @PathVariable UUID workspaceId,
-            @Valid @RequestBody CreateCategoryRequest request,
-            @AuthenticationPrincipal Jwt jwt) {
+	@PostMapping
+	public ResponseEntity<CategoryResponse> create(@PathVariable UUID workspaceId,
+			@Valid @RequestBody CreateCategoryRequest request, @AuthenticationPrincipal Jwt jwt) {
 
-        UUID ownerId = UUID.fromString(
-            jwt.getSubject()
-        );
+		UUID ownerId = UUID.fromString(jwt.getSubject());
 
-        Category category = service.create(
-            workspaceId,
-            request.name(),
-            request.type(),
-            ownerId
-        );
+		Category category = service.create(workspaceId, request.name(), request.type(), ownerId);
 
-        URI location = URI.create(
-            "/api/v1/workspaces/" + workspaceId
-            + "/categories/" + category.getId()
-        );
+		URI location = URI.create("/api/v1/workspaces/" + workspaceId + "/categories/" + category.getId());
 
-        return ResponseEntity
-            .created(location)
-            .body(CategoryResponse.from(category));
-    }
+		return ResponseEntity.created(location).body(CategoryResponse.from(category));
+	}
 
-    @GetMapping
-    public List<CategoryResponse> findAll(
-            @PathVariable UUID workspaceId,
-            @AuthenticationPrincipal Jwt jwt) {
+	@GetMapping
+	public List<CategoryResponse> findAll(@PathVariable UUID workspaceId, @AuthenticationPrincipal Jwt jwt) {
 
-        UUID ownerId = UUID.fromString(
-            jwt.getSubject()
-        );
+		UUID ownerId = UUID.fromString(jwt.getSubject());
 
-        return service.findAllByWorkspace(
-                workspaceId, ownerId
-            )
-            .stream()
-            .map(CategoryResponse::from)
-            .toList();
-    }
+		return service.findAllByWorkspace(workspaceId, ownerId).stream().map(CategoryResponse::from).toList();
+	}
 
-    @GetMapping("/{categoryId}")
-    public CategoryResponse findById(
-            @PathVariable UUID workspaceId,
-            @PathVariable UUID categoryId,
-            @AuthenticationPrincipal Jwt jwt) {
+	@GetMapping("/{categoryId}")
+	public CategoryResponse findById(@PathVariable UUID workspaceId, @PathVariable UUID categoryId,
+			@AuthenticationPrincipal Jwt jwt) {
 
-        UUID ownerId = UUID.fromString(
-            jwt.getSubject()
-        );
+		UUID ownerId = UUID.fromString(jwt.getSubject());
 
-        Category category = service.findById(
-            workspaceId,
-            categoryId,
-            ownerId
-        );
+		Category category = service.findById(workspaceId, categoryId, ownerId);
 
-        return CategoryResponse.from(category);
-    }
+		return CategoryResponse.from(category);
+	}
+
+	@PatchMapping("/{categoryId}")
+	public CategoryResponse rename(@PathVariable UUID workspaceId, @PathVariable UUID categoryId,
+			@Valid @RequestBody UpdateCategoryRequest request, @AuthenticationPrincipal Jwt jwt) {
+
+		UUID ownerId = UUID.fromString(jwt.getSubject());
+
+		Category category = service.rename(workspaceId, categoryId, request.name(), ownerId);
+
+		return CategoryResponse.from(category);
+	}
+
 }

@@ -27,104 +27,102 @@ import com.financesuite.zsurapp.workspace.service.WorkspaceService;
 
 @WebMvcTest(WorkspaceController.class)
 @Import(SecurityConfig.class)
-@TestPropertySource(properties = {
-    "SUPABASE_URL=https://auth.test.invalid"
-})
+@TestPropertySource(properties = { "SUPABASE_URL=https://auth.test.invalid" })
 class WorkspaceControllerSecurityTest {
 
-    private static final String URL =
-        "/api/v1/workspaces";
 
-    private static final UUID USER_ID =
-        UUID.fromString(
-            "11111111-1111-4111-8111-111111111111"
-        );
+	private static final UUID USER_ID = UUID.fromString("11111111-1111-4111-8111-111111111111");
+	private static final UUID WORKSPACE_ID =
+		    UUID.fromString(
+		        "22222222-2222-4222-8222-222222222222"
+		    );
 
-    @Autowired
-    private MockMvc mockMvc;
+	private static final String URL =
+		    "/api/v1/workspaces";
 
-    @MockitoBean
-    private WorkspaceService service;
+	@Autowired
+	private MockMvc mockMvc;
 
-    @MockitoBean
-    private JwtDecoder jwtDecoder;
+	@MockitoBean
+	private WorkspaceService service;
 
-    @Test
-    void shouldRejectUnauthenticatedRequest()
-            throws Exception {
+	@MockitoBean
+	private JwtDecoder jwtDecoder;
 
-        mockMvc.perform(get(URL))
-            .andExpect(status().isUnauthorized());
+	@Test
+	void shouldRejectUnauthenticatedRequest() throws Exception {
 
-        verifyNoInteractions(service);
-    }
+		mockMvc.perform(get(URL)).andExpect(status().isUnauthorized());
 
-    @Test
-    void shouldListWorkspacesForAuthenticatedUser()
-            throws Exception {
+		verifyNoInteractions(service);
+	}
 
-        when(service.findAllByOwner(USER_ID))
-            .thenReturn(java.util.List.of());
+	@Test
+	void shouldListWorkspacesForAuthenticatedUser() throws Exception {
 
-        mockMvc.perform(
-                get(URL)
-                    .with(jwt().jwt(token ->
-                        token.subject(USER_ID.toString())
-                    ))
-            )
-            .andExpect(status().isOk())
-            .andExpect(content().json("[]"));
+		when(service.findAllByOwner(USER_ID)).thenReturn(java.util.List.of());
 
-        verify(service).findAllByOwner(USER_ID);
-    }
+		mockMvc.perform(get(URL).with(jwt().jwt(token -> token.subject(USER_ID.toString())))).andExpect(status().isOk())
+				.andExpect(content().json("[]"));
 
-    @Test
-    void shouldRejectBlankWorkspaceName()
-            throws Exception {
+		verify(service).findAllByOwner(USER_ID);
+	}
 
-        String body = """
-            {
-              "name": "",
-              "type": "PERSONAL"
-            }
-            """;
+	@Test
+	void shouldRejectBlankWorkspaceName() throws Exception {
 
-        mockMvc.perform(
-                post(URL)
-                    .with(jwt().jwt(token ->
-                        token.subject(USER_ID.toString())
-                    ))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(body)
-            )
-            .andExpect(status().isBadRequest());
+		String body = """
+				{
+				  "name": "",
+				  "type": "PERSONAL"
+				}
+				""";
 
-        verifyNoInteractions(service);
-    }
+		mockMvc.perform(post(URL).with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+				.contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest());
 
-    @Test
-    void shouldNotExposeAnotherUsersWorkspace()
-            throws Exception {
+		verifyNoInteractions(service);
+	}
 
-        UUID workspaceId = UUID.randomUUID();
+	@Test
+	void shouldNotExposeAnotherUsersWorkspace() throws Exception {
 
-        when(service.findByIdAndOwner(
-                workspaceId, USER_ID))
-            .thenThrow(new ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "Espacio financiero no encontrado"
-            ));
+		UUID workspaceId = UUID.randomUUID();
 
-        mockMvc.perform(
-                get(URL + "/" + workspaceId)
-                    .with(jwt().jwt(token ->
-                        token.subject(USER_ID.toString())
-                    ))
-            )
-            .andExpect(status().isNotFound());
+		when(service.findByIdAndOwner(workspaceId, USER_ID))
+				.thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Espacio financiero no encontrado"));
 
-        verify(service).findByIdAndOwner(
-            workspaceId, USER_ID
-        );
-    }
+		mockMvc.perform(get(URL + "/" + workspaceId).with(jwt().jwt(token -> token.subject(USER_ID.toString()))))
+				.andExpect(status().isNotFound());
+
+		verify(service).findByIdAndOwner(workspaceId, USER_ID);
+	}
+
+	@Test
+	void shouldRejectUnauthenticatedRename() throws Exception {
+
+		UUID categoryId = UUID.randomUUID();
+
+		mockMvc.perform(patch(URL + "/" + categoryId).contentType(MediaType.APPLICATION_JSON).content("""
+				{"name": "Nuevo nombre"}
+				""")).andExpect(status().isUnauthorized());
+
+		verifyNoInteractions(service);
+	}
+
+	@Test
+	void shouldRejectEmptyNameOnPatch() throws Exception {
+
+		UUID categoryId = UUID.randomUUID();
+
+		mockMvc.perform(patch(URL + "/" + categoryId).with(jwt().jwt(token -> token.subject(USER_ID.toString())))
+				.contentType(MediaType.APPLICATION_JSON).content("""
+						{"name": ""}
+						""")).andExpect(status().isBadRequest());
+
+		verifyNoInteractions(service);
+	}
+
+	
+
 }

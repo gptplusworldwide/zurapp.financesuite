@@ -27,218 +27,196 @@ import com.financesuite.zsurapp.workspace.service.WorkspaceService;
 @ExtendWith(MockitoExtension.class)
 class CategoryServiceTest {
 
-    @Mock
-    private CategoryRepository repository;
+	@Mock
+	private CategoryRepository repository;
 
-    @Mock
-    private WorkspaceService workspaceService;
+	@Mock
+	private WorkspaceService workspaceService;
 
-    private CategoryService service;
-    private UUID ownerId;
-    private UUID workspaceId;
-    private Workspace workspace;
+	private CategoryService service;
+	private UUID ownerId;
+	private UUID workspaceId;
+	private Workspace workspace;
 
-    @BeforeEach
-    void setUp() {
+	@BeforeEach
+	void setUp() {
 
-        service = new CategoryService(
-            repository,
-            workspaceService
-        );
+		service = new CategoryService(repository, workspaceService);
 
-        ownerId = UUID.randomUUID();
+		ownerId = UUID.randomUUID();
 
-        workspace = new Workspace(
-            "Finanzas Personales",
-            WorkspaceType.PERSONAL,
-            ownerId
-        );
+		workspace = new Workspace("Finanzas Personales", WorkspaceType.PERSONAL, ownerId);
 
-        workspaceId = workspace.getId();
-    }
+		workspaceId = workspace.getId();
+	}
 
-    @Test
-    void shouldCreateExpenseCategory() {
+	@Test
+	void shouldCreateExpenseCategory() {
 
-        when(workspaceService.findByIdAndOwner(
-                workspaceId, ownerId))
-            .thenReturn(workspace);
+		when(workspaceService.findByIdAndOwner(workspaceId, ownerId)).thenReturn(workspace);
 
-        when(repository.save(any(Category.class)))
-            .thenAnswer(invocation ->
-                invocation.getArgument(0)
-            );
+		when(repository.save(any(Category.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Category result = service.create(
-            workspaceId,
-            "Alimentación",
-            CategoryType.EXPENSE,
-            ownerId
-        );
+		Category result = service.create(workspaceId, "Alimentación", CategoryType.EXPENSE, ownerId);
 
-        assertNotNull(result.getId());
-        assertEquals(workspaceId, result.getWorkspaceId());
-        assertEquals("Alimentación", result.getName());
-        assertEquals(CategoryType.EXPENSE, result.getType());
+		assertNotNull(result.getId());
+		assertEquals(workspaceId, result.getWorkspaceId());
+		assertEquals("Alimentación", result.getName());
+		assertEquals(CategoryType.EXPENSE, result.getType());
 
-        verify(repository).save(any(Category.class));
-    }
+		verify(repository).save(any(Category.class));
+	}
 
-    @Test
-    void shouldCreateIncomeCategory() {
+	@Test
+	void shouldCreateIncomeCategory() {
 
-        when(workspaceService.findByIdAndOwner(
-                workspaceId, ownerId))
-            .thenReturn(workspace);
+		when(workspaceService.findByIdAndOwner(workspaceId, ownerId)).thenReturn(workspace);
 
-        when(repository.save(any(Category.class)))
-            .thenAnswer(invocation ->
-                invocation.getArgument(0)
-            );
+		when(repository.save(any(Category.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Category result = service.create(
-            workspaceId,
-            "Sueldo",
-            CategoryType.INCOME,
-            ownerId
-        );
+		Category result = service.create(workspaceId, "Sueldo", CategoryType.INCOME, ownerId);
 
-        assertEquals("Sueldo", result.getName());
-        assertEquals(CategoryType.INCOME, result.getType());
-    }
+		assertEquals("Sueldo", result.getName());
+		assertEquals(CategoryType.INCOME, result.getType());
+	}
 
-    @Test
-    void shouldRejectDuplicateCategory() {
+	@Test
+	void shouldRejectDuplicateCategory() {
 
-        when(workspaceService.findByIdAndOwner(
-                workspaceId, ownerId))
-            .thenReturn(workspace);
+		when(workspaceService.findByIdAndOwner(workspaceId, ownerId)).thenReturn(workspace);
 
-        when(repository.existsByWorkspaceIdAndTypeAndName(
-                workspaceId,
-                CategoryType.EXPENSE,
-                "Alimentación"
-            ))
-            .thenReturn(true);
+		when(repository.existsByWorkspaceIdAndTypeAndName(workspaceId, CategoryType.EXPENSE, "Alimentación"))
+				.thenReturn(true);
 
-        ResponseStatusException exception =
-            assertThrows(
-                ResponseStatusException.class,
-                () -> service.create(
-                    workspaceId,
-                    "Alimentación",
-                    CategoryType.EXPENSE,
-                    ownerId
-                )
-            );
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> service.create(workspaceId, "Alimentación", CategoryType.EXPENSE, ownerId));
 
-        assertEquals(
-            HttpStatus.CONFLICT,
-            exception.getStatusCode()
-        );
+		assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
 
-        verify(repository, never()).save(any());
-    }
+		verify(repository, never()).save(any());
+	}
 
-    @Test
-    void shouldRejectCreationInForeignWorkspace() {
+	@Test
+	void shouldRejectCreationInForeignWorkspace() {
 
-        when(workspaceService.findByIdAndOwner(
-                workspaceId, ownerId))
-            .thenThrow(new ResponseStatusException(
-                HttpStatus.NOT_FOUND
-            ));
+		when(workspaceService.findByIdAndOwner(workspaceId, ownerId))
+				.thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        assertThrows(
-            ResponseStatusException.class,
-            () -> service.create(
-                workspaceId,
-                "Privada",
-                CategoryType.EXPENSE,
-                ownerId
-            )
-        );
+		assertThrows(ResponseStatusException.class,
+				() -> service.create(workspaceId, "Privada", CategoryType.EXPENSE, ownerId));
 
-        verifyNoInteractions(repository);
-    }
+		verifyNoInteractions(repository);
+	}
 
-    @Test
-    void shouldListCategoriesOfOwnWorkspace() {
+	@Test
+	void shouldListCategoriesOfOwnWorkspace() {
 
-        when(workspaceService.findByIdAndOwner(
-                workspaceId, ownerId))
-            .thenReturn(workspace);
+		when(workspaceService.findByIdAndOwner(workspaceId, ownerId)).thenReturn(workspace);
 
-        Category category = new Category(
-            workspaceId,
-            "Transporte",
-            CategoryType.EXPENSE
-        );
+		Category category = new Category(workspaceId, "Transporte", CategoryType.EXPENSE);
 
-        when(repository.findAllByWorkspaceId(workspaceId))
-            .thenReturn(List.of(category));
+		when(repository.findAllByWorkspaceId(workspaceId)).thenReturn(List.of(category));
 
-        List<Category> result =
-            service.findAllByWorkspace(
-                workspaceId,
-                ownerId
-            );
+		List<Category> result = service.findAllByWorkspace(workspaceId, ownerId);
 
-        assertEquals(1, result.size());
-        assertEquals("Transporte", result.get(0).getName());
+		assertEquals(1, result.size());
+		assertEquals("Transporte", result.get(0).getName());
 
-        verify(repository)
-            .findAllByWorkspaceId(workspaceId);
-    }
+		verify(repository).findAllByWorkspaceId(workspaceId);
+	}
 
-    @Test
-    void shouldRejectListingForeignWorkspace() {
+	@Test
+	void shouldRejectListingForeignWorkspace() {
 
-        when(workspaceService.findByIdAndOwner(
-                workspaceId, ownerId))
-            .thenThrow(new ResponseStatusException(
-                HttpStatus.NOT_FOUND
-            ));
+		when(workspaceService.findByIdAndOwner(workspaceId, ownerId))
+				.thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        assertThrows(
-            ResponseStatusException.class,
-            () -> service.findAllByWorkspace(
-                workspaceId,
-                ownerId
-            )
-        );
+		assertThrows(ResponseStatusException.class, () -> service.findAllByWorkspace(workspaceId, ownerId));
 
-        verifyNoInteractions(repository);
-    }
+		verifyNoInteractions(repository);
+	}
 
-    @Test
-    void shouldReturn404ForMissingCategory() {
+	@Test
+	void shouldReturn404ForMissingCategory() {
 
-        UUID categoryId = UUID.randomUUID();
+		UUID categoryId = UUID.randomUUID();
 
-        when(workspaceService.findByIdAndOwner(
-                workspaceId, ownerId))
-            .thenReturn(workspace);
+		when(workspaceService.findByIdAndOwner(workspaceId, ownerId)).thenReturn(workspace);
 
-        when(repository.findByIdAndWorkspaceId(
-                categoryId,
-                workspaceId
-            ))
-            .thenReturn(Optional.empty());
+		when(repository.findByIdAndWorkspaceId(categoryId, workspaceId)).thenReturn(Optional.empty());
 
-        ResponseStatusException exception =
-            assertThrows(
-                ResponseStatusException.class,
-                () -> service.findById(
-                    workspaceId,
-                    categoryId,
-                    ownerId
-                )
-            );
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> service.findById(workspaceId, categoryId, ownerId));
 
-        assertEquals(
-            HttpStatus.NOT_FOUND,
-            exception.getStatusCode()
-        );
-    }
+		assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+	}
+
+	@Test
+	void shouldRenameCategory() {
+
+		Category category = new Category(workspaceId, "Alimentación", CategoryType.EXPENSE);
+
+		when(workspaceService.findByIdAndOwner(workspaceId, ownerId)).thenReturn(workspace);
+
+		when(repository.findByIdAndWorkspaceId(category.getId(), workspaceId)).thenReturn(Optional.of(category));
+
+		Category result = service.rename(workspaceId, category.getId(), "Comida y supermercado", ownerId);
+
+		assertEquals("Comida y supermercado", result.getName());
+		assertEquals(CategoryType.EXPENSE, result.getType());
+		assertEquals(workspaceId, result.getWorkspaceId());
+
+		verify(repository).existsByWorkspaceIdAndTypeAndName(workspaceId, CategoryType.EXPENSE,
+				"Comida y supermercado");
+	}
+
+	@Test
+	void shouldRejectRenameToDuplicateName() {
+
+		Category category = new Category(workspaceId, "Alimentación", CategoryType.EXPENSE);
+
+		when(workspaceService.findByIdAndOwner(workspaceId, ownerId)).thenReturn(workspace);
+
+		when(repository.findByIdAndWorkspaceId(category.getId(), workspaceId)).thenReturn(Optional.of(category));
+
+		when(repository.existsByWorkspaceIdAndTypeAndName(workspaceId, CategoryType.EXPENSE, "Transporte"))
+				.thenReturn(true);
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> service.rename(workspaceId, category.getId(), "Transporte", ownerId));
+
+		assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+		assertEquals("Alimentación", category.getName());
+	}
+
+	@Test
+	void shouldRejectRenameInForeignWorkspace() {
+
+		UUID categoryId = UUID.randomUUID();
+
+		when(workspaceService.findByIdAndOwner(workspaceId, ownerId))
+				.thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+		assertThrows(ResponseStatusException.class,
+				() -> service.rename(workspaceId, categoryId, "Nuevo nombre", ownerId));
+
+		verifyNoInteractions(repository);
+	}
+
+	@Test
+	void shouldRejectEmptyNameOnRename() {
+
+		Category category = new Category(workspaceId, "Alimentación", CategoryType.EXPENSE);
+
+		when(workspaceService.findByIdAndOwner(workspaceId, ownerId)).thenReturn(workspace);
+
+		when(repository.findByIdAndWorkspaceId(category.getId(), workspaceId)).thenReturn(Optional.of(category));
+
+		ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+				() -> service.rename(workspaceId, category.getId(), "  ", ownerId));
+
+		assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+		assertEquals("Alimentación", category.getName());
+	}
+
 }
