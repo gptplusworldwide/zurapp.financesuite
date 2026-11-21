@@ -102,5 +102,5 @@ public class Category {
 
 		this.name = normalizedName;
 	}
-	
+
 }
