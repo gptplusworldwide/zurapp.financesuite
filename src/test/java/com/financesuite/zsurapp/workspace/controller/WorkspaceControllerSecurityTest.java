@@ -123,6 +123,6 @@ class WorkspaceControllerSecurityTest {
 		verifyNoInteractions(service);
 	}
 
-	
+
 
 }
