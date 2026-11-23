@@ -146,4 +146,95 @@ class TransactionRepositoryTest {
 
 		assertTrue(repository.findByIdAndWorkspaceId(transaction.getId(), workspaceId).isPresent());
 	}
+
+	@Test
+	void shouldReturnZeroBalanceSumsWithoutTransactions() {
+
+		BigDecimal income = repository.sumIncomeByAccount(workspaceId, accountId);
+
+		BigDecimal expense = repository.sumExpenseByAccount(workspaceId, accountId);
+
+		assertNotNull(income);
+		assertNotNull(expense);
+
+		assertEquals(0, BigDecimal.ZERO.compareTo(income));
+		assertEquals(0, BigDecimal.ZERO.compareTo(expense));
+	}
+
+	@Test
+	void shouldSumIncomeAndExpenseSeparately() {
+
+		UUID incomeCategoryId = UUID.randomUUID();
+
+		jdbcTemplate.update("""
+				INSERT INTO categories
+				    (id, workspace_id, name, type)
+				VALUES (?, ?, ?, ?)
+				""", incomeCategoryId, workspaceId, "Sueldo", "INCOME");
+
+		Transaction income = new Transaction(workspaceId, accountId, incomeCategoryId, TransactionType.INCOME,
+				new BigDecimal("50000.0000"), "Cobro de sueldo", Instant.parse("2026-11-23T10:00:00Z"));
+
+		Transaction expense1 = newTransaction(new BigDecimal("15000.0000"), Instant.parse("2026-11-23T11:00:00Z"));
+
+		Transaction expense2 = newTransaction(new BigDecimal("5000.0000"), Instant.parse("2026-11-23T12:00:00Z"));
+
+		repository.saveAllAndFlush(List.of(income, expense1, expense2));
+
+		BigDecimal totalIncome = repository.sumIncomeByAccount(workspaceId, accountId);
+
+		BigDecimal totalExpense = repository.sumExpenseByAccount(workspaceId, accountId);
+
+		assertEquals(0, new BigDecimal("50000.0000").compareTo(totalIncome));
+
+		assertEquals(0, new BigDecimal("20000.0000").compareTo(totalExpense));
+	}
+
+	@Test
+	void shouldNotMixTransactionsFromDifferentAccounts() {
+
+		UUID anotherAccountId = UUID.randomUUID();
+
+		jdbcTemplate.update("""
+				INSERT INTO accounts
+				    (id, workspace_id, name, type,
+				     currency, initial_balance)
+				VALUES (?, ?, ?, ?, ?, ?)
+				""", anotherAccountId, workspaceId, "Banco", "BANK", "ARS", new BigDecimal("100000.0000"));
+
+		Transaction firstAccountTransaction = newTransaction(new BigDecimal("15000.0000"),
+				Instant.parse("2026-11-23T12:00:00Z"));
+
+		Transaction secondAccountTransaction = new Transaction(workspaceId, anotherAccountId, categoryId,
+				TransactionType.EXPENSE, new BigDecimal("40000.0000"), "Compra con tarjeta",
+				Instant.parse("2026-11-23T13:00:00Z"));
+
+		repository.saveAllAndFlush(List.of(firstAccountTransaction, secondAccountTransaction));
+
+		BigDecimal firstAccountExpenses = repository.sumExpenseByAccount(workspaceId, accountId);
+
+		BigDecimal secondAccountExpenses = repository.sumExpenseByAccount(workspaceId, anotherAccountId);
+
+		assertEquals(0, new BigDecimal("15000.0000").compareTo(firstAccountExpenses));
+
+		assertEquals(0, new BigDecimal("40000.0000").compareTo(secondAccountExpenses));
+	}
+
+	@Test
+	void shouldNotExposeBalanceSumsAcrossWorkspaces() {
+
+		Transaction transaction = newTransaction(new BigDecimal("15000.0000"), Instant.parse("2026-11-23T12:00:00Z"));
+
+		repository.saveAndFlush(transaction);
+
+		UUID foreignWorkspaceId = UUID.randomUUID();
+
+		BigDecimal income = repository.sumIncomeByAccount(foreignWorkspaceId, accountId);
+
+		BigDecimal expense = repository.sumExpenseByAccount(foreignWorkspaceId, accountId);
+
+		assertEquals(0, BigDecimal.ZERO.compareTo(income));
+		assertEquals(0, BigDecimal.ZERO.compareTo(expense));
+	}
+
 }
