@@ -58,14 +58,16 @@ class AccountBalanceControllerSecurityTest {
 	void shouldReturnBalanceForAuthenticatedUser() throws Exception {
 
 		AccountBalanceResponse response = new AccountBalanceResponse(ACCOUNT_ID, WORKSPACE_ID, "Efectivo personal",
-				"ARS", new BigDecimal("150000.0000"), BigDecimal.ZERO, new BigDecimal("15000.0000"),
-				new BigDecimal("135000.0000"));
+				"ARS", new BigDecimal("150000.0000"), BigDecimal.ZERO, new BigDecimal("15000.0000"), BigDecimal.ZERO,
+				new BigDecimal("20000.0000"), new BigDecimal("115000.0000"));
 
 		when(service.getBalance(WORKSPACE_ID, ACCOUNT_ID, USER_ID)).thenReturn(response);
 
 		mockMvc.perform(get(URL).with(jwt().jwt(token -> token.subject(USER_ID.toString())))).andExpect(status().isOk())
 				.andExpect(jsonPath("$.accountId").value(ACCOUNT_ID.toString()))
-				.andExpect(jsonPath("$.currency").value("ARS")).andExpect(jsonPath("$.currentBalance").value(135000.0));
+				.andExpect(jsonPath("$.currentBalance").value(115000.0))
+				.andExpect(jsonPath("$.incomingTransfers").value(0.0))
+				.andExpect(jsonPath("$.outgoingTransfers").value(20000.0));
 
 		verify(service).getBalance(WORKSPACE_ID, ACCOUNT_ID, USER_ID);
 	}
