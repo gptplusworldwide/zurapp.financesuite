@@ -11,7 +11,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -22,6 +21,7 @@ import com.financesuite.zsurapp.account.dto.AccountBalanceResponse;
 import com.financesuite.zsurapp.account.entity.Account;
 import com.financesuite.zsurapp.account.repository.AccountRepository;
 import com.financesuite.zsurapp.transaction.repository.TransactionRepository;
+import com.financesuite.zsurapp.transfer.repository.TransferRepository;
 import com.financesuite.zsurapp.workspace.service.WorkspaceService;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +34,9 @@ class AccountBalanceServiceTest {
 	private TransactionRepository transactionRepository;
 
 	@Mock
+	private TransferRepository transferRepository;
+
+	@Mock
 	private WorkspaceService workspaceService;
 
 	private AccountBalanceService service;
@@ -44,7 +47,9 @@ class AccountBalanceServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new AccountBalanceService(accountRepository, transactionRepository, workspaceService);
+
+		service = new AccountBalanceService(accountRepository, transactionRepository, transferRepository,
+				workspaceService);
 
 		workspaceId = UUID.randomUUID();
 		accountId = UUID.randomUUID();
@@ -59,14 +64,21 @@ class AccountBalanceServiceTest {
 		when(accountRepository.findByIdAndWorkspaceId(accountId, workspaceId)).thenReturn(Optional.of(account));
 
 		when(account.getId()).thenReturn(accountId);
+
 		when(account.getName()).thenReturn("Efectivo personal");
+
 		when(account.getCurrency()).thenReturn("ARS");
+
 		when(account.getInitialBalance()).thenReturn(new BigDecimal("150000.0000"));
 
 		when(transactionRepository.sumIncomeByAccount(workspaceId, accountId)).thenReturn(new BigDecimal("50000.0000"));
 
 		when(transactionRepository.sumExpenseByAccount(workspaceId, accountId))
 				.thenReturn(new BigDecimal("15000.0000"));
+
+		when(transferRepository.sumIncomingByAccount(workspaceId, accountId)).thenReturn(BigDecimal.ZERO);
+
+		when(transferRepository.sumOutgoingByAccount(workspaceId, accountId)).thenReturn(BigDecimal.ZERO);
 
 		AccountBalanceResponse result = service.getBalance(workspaceId, accountId, ownerId);
 
@@ -93,6 +105,10 @@ class AccountBalanceServiceTest {
 		when(transactionRepository.sumExpenseByAccount(workspaceId, accountId))
 				.thenReturn(new BigDecimal("15000.0000"));
 
+		when(transferRepository.sumIncomingByAccount(workspaceId, accountId)).thenReturn(BigDecimal.ZERO);
+
+		when(transferRepository.sumOutgoingByAccount(workspaceId, accountId)).thenReturn(BigDecimal.ZERO);
+
 		AccountBalanceResponse result = service.getBalance(workspaceId, accountId, ownerId);
 
 		assertEquals(0, new BigDecimal("135000.0000").compareTo(result.currentBalance()));
@@ -111,6 +127,10 @@ class AccountBalanceServiceTest {
 
 		when(transactionRepository.sumExpenseByAccount(workspaceId, accountId)).thenReturn(BigDecimal.ZERO);
 
+		when(transferRepository.sumIncomingByAccount(workspaceId, accountId)).thenReturn(BigDecimal.ZERO);
+
+		when(transferRepository.sumOutgoingByAccount(workspaceId, accountId)).thenReturn(BigDecimal.ZERO);
+
 		AccountBalanceResponse result = service.getBalance(workspaceId, accountId, ownerId);
 
 		assertEquals(0, new BigDecimal("100000.0000").compareTo(result.currentBalance()));
@@ -127,7 +147,7 @@ class AccountBalanceServiceTest {
 
 		assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
 
-		verifyNoInteractions(accountRepository, transactionRepository);
+		verifyNoInteractions(accountRepository, transactionRepository, transferRepository);
 	}
 
 	@Test
@@ -140,6 +160,60 @@ class AccountBalanceServiceTest {
 
 		assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
 
-		verifyNoInteractions(transactionRepository);
+		verifyNoInteractions(transactionRepository, transferRepository);
 	}
+
+	@Test
+	void shouldSubtractOutgoingTransfersFromBalance() {
+
+		Account account = mock(Account.class);
+
+		when(accountRepository.findByIdAndWorkspaceId(accountId, workspaceId)).thenReturn(Optional.of(account));
+
+		when(account.getInitialBalance()).thenReturn(new BigDecimal("150000.0000"));
+
+		when(transactionRepository.sumIncomeByAccount(workspaceId, accountId)).thenReturn(BigDecimal.ZERO);
+
+		when(transactionRepository.sumExpenseByAccount(workspaceId, accountId))
+				.thenReturn(new BigDecimal("15000.0000"));
+
+		when(transferRepository.sumIncomingByAccount(workspaceId, accountId)).thenReturn(BigDecimal.ZERO);
+
+		when(transferRepository.sumOutgoingByAccount(workspaceId, accountId)).thenReturn(new BigDecimal("20000.0000"));
+
+		AccountBalanceResponse result = service.getBalance(workspaceId, accountId, ownerId);
+
+		assertEquals(0, new BigDecimal("115000.0000").compareTo(result.currentBalance()));
+
+		assertEquals(0, new BigDecimal("150000.0000").compareTo(result.initialBalance()));
+
+		assertEquals(0, new BigDecimal("20000.0000").compareTo(result.outgoingTransfers()));
+
+	}
+
+	@Test
+	void shouldAddIncomingTransfersToBalance() {
+
+		Account account = mock(Account.class);
+
+		when(accountRepository.findByIdAndWorkspaceId(accountId, workspaceId)).thenReturn(Optional.of(account));
+
+		when(account.getInitialBalance()).thenReturn(new BigDecimal("0.0000"));
+
+		when(transactionRepository.sumIncomeByAccount(workspaceId, accountId)).thenReturn(BigDecimal.ZERO);
+
+		when(transactionRepository.sumExpenseByAccount(workspaceId, accountId)).thenReturn(BigDecimal.ZERO);
+
+		when(transferRepository.sumIncomingByAccount(workspaceId, accountId)).thenReturn(new BigDecimal("20000.0000"));
+
+		when(transferRepository.sumOutgoingByAccount(workspaceId, accountId)).thenReturn(BigDecimal.ZERO);
+
+		AccountBalanceResponse result = service.getBalance(workspaceId, accountId, ownerId);
+
+		assertEquals(0, new BigDecimal("20000.0000").compareTo(result.currentBalance()));
+
+		assertEquals(0, new BigDecimal("20000.0000").compareTo(result.incomingTransfers()));
+
+	}
+
 }
